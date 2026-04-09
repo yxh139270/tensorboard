@@ -19,8 +19,12 @@
 import collections.abc
 import math
 import os.path
+import tempfile
+import types
 
 import tensorflow as tf
+from werkzeug import test as werkzeug_test
+from werkzeug import wrappers
 
 from google.protobuf import text_format
 from tensorboard import context
@@ -77,7 +81,7 @@ class GraphsPluginBaseTest:
         """Create a run."""
         raise NotImplementedError("Please implement generate_run")
 
-    def load_plugin(self, run_specs):
+    def load_plugin(self, run_specs, mlir_file=None):
         logdir = self.get_temp_dir()
         for run_spec in run_specs:
             self.generate_run(logdir, *run_spec)
@@ -85,10 +89,12 @@ class GraphsPluginBaseTest:
         multiplexer.AddRunsFromDirectory(logdir)
         multiplexer.Reload()
         provider = data_provider.MultiplexerDataProvider(multiplexer, logdir)
+        flags = types.SimpleNamespace(mlir_file=mlir_file)
         ctx = base_plugin.TBContext(
             logdir=logdir,
             multiplexer=multiplexer,
             data_provider=provider,
+            flags=flags,
         )
         return graphs_plugin.GraphsPlugin(ctx)
 
@@ -272,6 +278,189 @@ class GraphsPluginV1Test(GraphsPluginBaseTest, tf.test.TestCase):
     def test_is_active(self):
         plugin = self.load_plugin([_RUN_WITH_GRAPH_WITHOUT_METADATA])
         self.assertFalse(plugin.is_active())
+
+    def test_info_includes_mlir_run_when_flag_set(self):
+        mlir_text = """
+          func.func @main(%arg0: tensor<1xf32>) -> tensor<1xf32> {
+            %0 = \"test.identity\"(%arg0) : (tensor<1xf32>) -> tensor<1xf32>
+            return %0 : tensor<1xf32>
+          }
+        """
+        with tempfile.NamedTemporaryFile("w", delete=False) as f:
+            f.write(mlir_text)
+            mlir_file = f.name
+
+        try:
+            plugin = self.load_plugin([], mlir_file=mlir_file)
+            actual = plugin.info_impl(context.RequestContext(), "eid")
+        finally:
+            os.remove(mlir_file)
+
+        self.assertIn(graphs_plugin.MLIR_IMPORT_RUN_NAME, actual)
+        self.assertEqual(
+            {
+                "run": graphs_plugin.MLIR_IMPORT_RUN_NAME,
+                "run_graph": True,
+                "tags": {},
+            },
+            actual[graphs_plugin.MLIR_IMPORT_RUN_NAME],
+        )
+
+    def test_graph_returns_mlir_graphdef_when_mlir_run_requested(self):
+        mlir_text = """
+          func.func @main(%arg0: tensor<1xf32>) -> tensor<1xf32> {
+            %0 = \"test.identity\"(%arg0) : (tensor<1xf32>) -> tensor<1xf32>
+            return %0 : tensor<1xf32>
+          }
+        """
+        with tempfile.NamedTemporaryFile("w", delete=False) as f:
+            f.write(mlir_text)
+            mlir_file = f.name
+
+        try:
+            plugin = self.load_plugin([], mlir_file=mlir_file)
+            graph = self._get_graph(
+                plugin,
+                run=graphs_plugin.MLIR_IMPORT_RUN_NAME,
+                tag=None,
+                is_conceptual=False,
+                experiment="eid",
+            )
+        finally:
+            os.remove(mlir_file)
+
+        node_names = set(node.name for node in graph.node)
+        self.assertIn("main/arg_arg0", node_names)
+        self.assertIn("main/op_0000_test.identity", node_names)
+
+    def test_graph_mlir_parse_error_raises_value_error(self):
+        invalid_mlir_text = """
+          func.func not_a_valid_header {
+            return
+          }
+        """
+        with tempfile.NamedTemporaryFile("w", delete=False) as f:
+            f.write(invalid_mlir_text)
+            mlir_file = f.name
+
+        try:
+            plugin = self.load_plugin([], mlir_file=mlir_file)
+            with self.assertRaisesRegex(ValueError, "failed to parse MLIR file"):
+                plugin.graph_impl(
+                    context.RequestContext(),
+                    graphs_plugin.MLIR_IMPORT_RUN_NAME,
+                    tag=None,
+                    is_conceptual=False,
+                    experiment="eid",
+                )
+        finally:
+            os.remove(mlir_file)
+
+    def test_graph_route_mlir_parse_error_returns_bad_request(self):
+        invalid_mlir_text = """
+          func.func not_a_valid_header {
+            return
+          }
+        """
+        with tempfile.NamedTemporaryFile("w", delete=False) as f:
+            f.write(invalid_mlir_text)
+            mlir_file = f.name
+
+        try:
+            plugin = self.load_plugin([], mlir_file=mlir_file)
+            info = plugin.info_impl(context.RequestContext(), "eid")
+            run = next(iter(info))
+            client = werkzeug_test.Client(plugin.graph_route, wrappers.Response)
+            response = client.get("/?run=%s" % run)
+        finally:
+            os.remove(mlir_file)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn(b"failed to parse MLIR file", response.get_data())
+
+    def test_info_uses_unique_mlir_run_name_on_conflict(self):
+        mlir_text = """
+          func.func @main(%arg0: tensor<1xf32>) -> tensor<1xf32> {
+            %0 = \"test.identity\"(%arg0) : (tensor<1xf32>) -> tensor<1xf32>
+            return %0 : tensor<1xf32>
+          }
+        """
+        with tempfile.NamedTemporaryFile("w", delete=False) as f:
+            f.write(mlir_text)
+            mlir_file = f.name
+
+        try:
+            plugin = self.load_plugin(
+                [(graphs_plugin.MLIR_IMPORT_RUN_NAME, False, False)],
+                mlir_file=mlir_file,
+            )
+            info = plugin.info_impl(context.RequestContext(), "eid")
+            mlir_run_names = [
+                run
+                for run, run_data in info.items()
+                if run.startswith(graphs_plugin.MLIR_IMPORT_RUN_NAME)
+                and run_data["run_graph"]
+            ]
+            mlir_graph = self._get_graph(
+                plugin,
+                run=mlir_run_names[0],
+                tag=None,
+                is_conceptual=False,
+                experiment="eid",
+            )
+            with self.assertRaises(errors.NotFoundError):
+                self._get_graph(
+                    plugin,
+                    run=graphs_plugin.MLIR_IMPORT_RUN_NAME,
+                    tag=None,
+                    is_conceptual=False,
+                    experiment="eid",
+                )
+        finally:
+            os.remove(mlir_file)
+
+        self.assertIn(graphs_plugin.MLIR_IMPORT_RUN_NAME, info)
+        self.assertLen(mlir_run_names, 1)
+        self.assertNotEqual(mlir_run_names[0], graphs_plugin.MLIR_IMPORT_RUN_NAME)
+        node_names = set(node.name for node in mlir_graph.node)
+        self.assertIn("main/op_0000_test.identity", node_names)
+
+    def test_graph_mlir_two_calls_with_different_limit_attr_size(self):
+        mlir_text = """
+          func.func @main(%arg0: tensor<1xf32>) -> tensor<1xf32> {
+            %0 = \"test.identity\"(%arg0) : (tensor<1xf32>) -> tensor<1xf32>
+            return %0 : tensor<1xf32>
+          }
+        """
+        with tempfile.NamedTemporaryFile("w", delete=False) as f:
+            f.write(mlir_text)
+            mlir_file = f.name
+
+        try:
+            plugin = self.load_plugin([], mlir_file=mlir_file)
+            first_graph = self._get_graph(
+                plugin,
+                run=graphs_plugin.MLIR_IMPORT_RUN_NAME,
+                tag=None,
+                is_conceptual=False,
+                experiment="eid",
+                limit_attr_size=1,
+                large_attrs_key="_large_attrs",
+            )
+            second_graph = self._get_graph(
+                plugin,
+                run=graphs_plugin.MLIR_IMPORT_RUN_NAME,
+                tag=None,
+                is_conceptual=False,
+                experiment="eid",
+                limit_attr_size=2048,
+                large_attrs_key="_large_attrs",
+            )
+        finally:
+            os.remove(mlir_file)
+
+        self.assertGreater(len(first_graph.node), 0)
+        self.assertGreater(len(second_graph.node), 0)
 
 
 if __name__ == "__main__":

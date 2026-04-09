@@ -17,6 +17,7 @@ py_library(
         ":graph_util",
         ":keras_util",
         ":metadata",
+        ":mlir_import",
         "//tensorboard:errors",
         "//tensorboard:expect_protobuf_installed",
         "//tensorboard:plugin_util",
@@ -160,6 +161,52 @@ py_library(
     name = "metadata",
     srcs = ["metadata.py"],
     srcs_version = "PY3",
+)
+
+py_library(
+    name = "mlir_import",
+    srcs = [
+        "mlir_import/__init__.py",
+        "mlir_import/custom_dialect_handlers.py",
+        "mlir_import/custom_dialect_ir.py",
+        "mlir_import/custom_dialect_parser.py",
+        "mlir_import/custom_dialect_tokenizer.py",
+        "mlir_import/custom_dialect_types.py",
+        "mlir_import/loader.py",
+        "mlir_import/mlir_to_graphdef.py",
+    ],
+    srcs_version = "PY3",
+    deps = ["//tensorboard/compat/proto:protos_all_py_pb2"],
+)
+
+py_test(
+    name = "custom_dialect_parser_test",
+    size = "small",
+    srcs = ["mlir_import/custom_dialect_parser_test.py"],
+    main = "mlir_import/custom_dialect_parser_test.py",
+    srcs_version = "PY3",
+    deps = [":mlir_import"],
+)
+
+py_test(
+    name = "mlir_to_graphdef_test",
+    size = "small",
+    srcs = ["mlir_import/mlir_to_graphdef_test.py"],
+    main = "mlir_import/mlir_to_graphdef_test.py",
+    srcs_version = "PY3",
+    deps = [
+        ":mlir_import",
+        "//tensorboard/compat/proto:protos_all_py_pb2",
+    ],
+)
+
+py_test(
+    name = "mlir_import_loader_test",
+    size = "small",
+    srcs = ["mlir_import/loader_test.py"],
+    main = "mlir_import/loader_test.py",
+    srcs_version = "PY3",
+    deps = [":mlir_import"],
 )
 
 # This test suite is disabled as lodash does not seem to get properly bundled

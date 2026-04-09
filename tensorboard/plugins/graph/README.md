@@ -82,6 +82,9 @@ Graphs can be loaded into TensorBoard by either:
     with event files containing a graph.
 -   Launching TensorBoard, opening the "Graphs" tab, and clicking "Choose file"
     in the left sidepane to upload a *.pbtxt from the filesystem.
+-   Launching TensorBoard with `--mlir_file /path/to/model.mlir` and selecting
+    run `__mlir_import__` (or its suffixed variant if there is a run name
+    collision).
 
 The dashboard offers a variety of features, including:
 

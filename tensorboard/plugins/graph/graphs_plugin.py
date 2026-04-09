@@ -29,9 +29,11 @@ from tensorboard.plugins import base_plugin
 from tensorboard.plugins.graph import graph_util
 from tensorboard.plugins.graph import keras_util
 from tensorboard.plugins.graph import metadata
+from tensorboard.plugins.graph.mlir_import import loader as mlir_loader
 from tensorboard.util import tb_logging
 
 logger = tb_logging.get_logger()
+MLIR_IMPORT_RUN_NAME = "__mlir_import__"
 
 
 class GraphsPlugin(base_plugin.TBPlugin):
@@ -46,6 +48,43 @@ class GraphsPlugin(base_plugin.TBPlugin):
           context: A base_plugin.TBContext instance.
         """
         self._data_provider = context.data_provider
+        self._mlir_graph = None
+        self._mlir_error = None
+        self._mlir_file = None
+
+        flags = getattr(context, "flags", None)
+        mlir_file = getattr(flags, "mlir_file", None) if flags else None
+        if mlir_file:
+            self._mlir_file = mlir_file
+            try:
+                self._mlir_graph = mlir_loader.load_mlir_graphdef(mlir_file)
+            except ValueError as e:
+                self._mlir_error = str(e)
+
+    def _collect_existing_run_names(self, ctx, experiment):
+        run_names = set()
+        for plugin_name in (
+            metadata.PLUGIN_NAME_RUN_METADATA_WITH_GRAPH,
+            metadata.PLUGIN_NAME_RUN_METADATA,
+            metadata.PLUGIN_NAME_KERAS_MODEL,
+            metadata.PLUGIN_NAME,
+            metadata.PLUGIN_NAME_TAGGED_RUN_METADATA,
+        ):
+            mapping = self._data_provider.list_blob_sequences(
+                ctx,
+                experiment_id=experiment,
+                plugin_name=plugin_name,
+            )
+            run_names.update(mapping.keys())
+        return run_names
+
+    def _resolve_mlir_import_run_name(self, existing_run_names):
+        mlir_import_run_name = MLIR_IMPORT_RUN_NAME
+        suffix = 1
+        while mlir_import_run_name in existing_run_names:
+            mlir_import_run_name = "%s_%d" % (MLIR_IMPORT_RUN_NAME, suffix)
+            suffix += 1
+        return mlir_import_run_name
 
     def get_plugin_apps(self):
         return {
@@ -177,6 +216,16 @@ class GraphsPlugin(base_plugin.TBPlugin):
                 (_, tag_item) = add_row_item(run_name, tag)
                 tag_item["profile"] = True
 
+        if self._mlir_file:
+            existing_run_names = self._collect_existing_run_names(
+                ctx, experiment
+            )
+            mlir_import_run_name = self._resolve_mlir_import_run_name(
+                existing_run_names
+            )
+            (run_item, _) = add_row_item(mlir_import_run_name)
+            run_item["run_graph"] = self._mlir_graph is not None
+
         return result
 
     def _read_blob(self, ctx, experiment, plugin_names, run, tag):
@@ -209,6 +258,24 @@ class GraphsPlugin(base_plugin.TBPlugin):
         large_attrs_key=None,
     ):
         """Result of the form `(body, mime_type)`; may raise `NotFound`."""
+        mlir_import_run_name = None
+        if self._mlir_file:
+            existing_run_names = self._collect_existing_run_names(ctx, experiment)
+            mlir_import_run_name = self._resolve_mlir_import_run_name(
+                existing_run_names
+            )
+        if run == mlir_import_run_name and tag is None:
+            if self._mlir_error:
+                raise ValueError(self._mlir_error)
+            if self._mlir_graph is not None:
+                graph = graph_pb2.GraphDef()
+                graph.CopyFrom(self._mlir_graph)
+                process_graph.prepare_graph_for_ui(
+                    graph, limit_attr_size, large_attrs_key
+                )
+                return (str(graph), "text/x-protobuf")
+            raise errors.NotFoundError()
+
         if is_conceptual:
             keras_model_config = json.loads(
                 self._read_blob(
@@ -314,7 +381,7 @@ class GraphsPlugin(base_plugin.TBPlugin):
                 large_attrs_key,
             )
         except ValueError as e:
-            return http_util.Respond(request, e.message, "text/plain", code=400)
+            return http_util.Respond(request, str(e), "text/plain", code=400)
         (body, mime_type) = result
         return http_util.Respond(request, body, mime_type)
 

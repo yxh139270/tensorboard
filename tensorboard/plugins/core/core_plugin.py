@@ -20,6 +20,7 @@ import functools
 import gzip
 import io
 import mimetypes
+import os
 import posixpath
 import zipfile
 
@@ -525,6 +526,17 @@ present and --logdir is not specified.\
         )
 
         parser.add_argument(
+            "--mlir_file",
+            metavar="PATH",
+            type=str,
+            default="",
+            help="""\
+Path to an MLIR file to load. If specified, the path must exist, point
+to a file, and be readable.\
+""",
+        )
+
+        parser.add_argument(
             "--path_prefix",
             metavar="PATH",
             type=str,
@@ -721,6 +733,21 @@ disable fast-loading mode. (default: false)\
                 "Path prefix must start with slash, but got: %r."
                 % flags.path_prefix
             )
+
+        if flags.mlir_file:
+            flags.mlir_file = os.path.expanduser(flags.mlir_file)
+            if not os.path.exists(flags.mlir_file):
+                raise FlagsError(
+                    "--mlir_file path does not exist: %r." % flags.mlir_file
+                )
+            if not os.path.isfile(flags.mlir_file):
+                raise FlagsError(
+                    "--mlir_file must be a file: %r." % flags.mlir_file
+                )
+            if not os.access(flags.mlir_file, os.R_OK):
+                raise FlagsError(
+                    "--mlir_file is not readable: %r." % flags.mlir_file
+                )
 
     def load(self, context):
         """Creates CorePlugin instance."""

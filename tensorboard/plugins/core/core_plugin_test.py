@@ -57,6 +57,7 @@ class FakeFlags:
         load_fast="auto",
         logdir="",
         logdir_spec="",
+        mlir_file="",
         path_prefix="",
         reuse_port=False,
         version_tb=False,
@@ -71,6 +72,7 @@ class FakeFlags:
         self.load_fast = load_fast
         self.logdir = logdir
         self.logdir_spec = logdir_spec
+        self.mlir_file = mlir_file
         self.path_prefix = path_prefix
         self.reuse_port = reuse_port
         self.version_tb = version_tb
@@ -131,6 +133,42 @@ class CorePluginFlagsTest(tf.test.TestCase):
         msg = str(cm.exception)
         self.assertIn("must start with slash", msg)
         self.assertIn(repr("noslash"), msg)
+
+    def testMlirFileFlag_validation(self):
+        loader = core_plugin.CorePluginLoader()
+
+        valid_path = os.path.join(self.get_temp_dir(), "model.mlir")
+        with open(valid_path, "w") as f:
+            f.write("module {}")
+
+        valid_flags = FakeFlags(inspect=False, logdir="/tmp", mlir_file=valid_path)
+        loader.fix_flags(valid_flags)
+        self.assertEqual(valid_flags.mlir_file, valid_path)
+
+        missing_path = os.path.join(self.get_temp_dir(), "missing.mlir")
+        with self.assertRaisesRegex(
+            base_plugin.FlagsError, r"--mlir_file path does not exist"
+        ):
+            loader.fix_flags(
+                FakeFlags(inspect=False, logdir="/tmp", mlir_file=missing_path)
+            )
+
+        directory_path = os.path.join(self.get_temp_dir(), "mlir_dir")
+        os.mkdir(directory_path)
+        with self.assertRaisesRegex(
+            base_plugin.FlagsError, r"--mlir_file must be a file"
+        ):
+            loader.fix_flags(
+                FakeFlags(inspect=False, logdir="/tmp", mlir_file=directory_path)
+            )
+
+        with mock.patch("os.access", return_value=False):
+            with self.assertRaisesRegex(
+                base_plugin.FlagsError, r"--mlir_file is not readable"
+            ):
+                loader.fix_flags(
+                    FakeFlags(inspect=False, logdir="/tmp", mlir_file=valid_path)
+                )
 
 
 class CorePluginTest(tf.test.TestCase):
