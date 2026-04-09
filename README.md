@@ -23,7 +23,7 @@ corporate firewall, or in a datacenter.
 Before running TensorBoard, make sure you have generated summary data in a log
 directory by creating a summary writer:
 
-``` python
+```python
 # sess.graph contains the graph definition; that enables the Graph Visualizer.
 
 file_writer = tf.summary.FileWriter('/path/to/logs', sess.graph)
@@ -41,11 +41,11 @@ tensorboard --logdir path/to/logs
 Or, if you are building from source:
 
 ```bash
-bazel build tensorboard:tensorboard
-./bazel-bin/tensorboard/tensorboard --logdir path/to/logs
+bazel build //tensorboard:tensorboard_mlir
+./bazel-bin/tensorboard/tensorboard_mlir --logdir /tmp/tb-mlir-clean --mlir_file /path/to/model.mlir
 
 # or even more succinctly
-bazel run tensorboard -- --logdir path/to/logs
+bazel run //tensorboard:tensorboard_mlir -- --logdir /tmp/tb-mlir-clean --mlir_file /path/to/model.mlir
 ```
 
 This should print that TensorBoard has started. Next, connect to
@@ -77,11 +77,12 @@ summary.FileWriter. A full explanation, with examples, is in [the
 tutorial](https://www.tensorflow.org/get_started/summaries_and_tensorboard).
 
 The supported summary ops include:
-* [`tf.summary.scalar`](https://www.tensorflow.org/api_docs/python/tf/summary/scalar)
-* [`tf.summary.image`](https://www.tensorflow.org/api_docs/python/tf/summary/image)
-* [`tf.summary.audio`](https://www.tensorflow.org/api_docs/python/tf/summary/audio)
-* [`tf.summary.text`](https://www.tensorflow.org/api_docs/python/tf/summary/text)
-* [`tf.summary.histogram`](https://www.tensorflow.org/api_docs/python/tf/summary/histogram)
+
+- [`tf.summary.scalar`](https://www.tensorflow.org/api_docs/python/tf/summary/scalar)
+- [`tf.summary.image`](https://www.tensorflow.org/api_docs/python/tf/summary/image)
+- [`tf.summary.audio`](https://www.tensorflow.org/api_docs/python/tf/summary/audio)
+- [`tf.summary.text`](https://www.tensorflow.org/api_docs/python/tf/summary/text)
+- [`tf.summary.histogram`](https://www.tensorflow.org/api_docs/python/tf/summary/histogram)
 
 ### Tags: Giving names to data
 
@@ -148,18 +149,18 @@ _This flag (`--logdir_spec`) is discouraged and can usually be avoided_. TensorB
 
 TensorBoard's Scalar Dashboard visualizes scalar statistics that vary over time;
 for example, you might want to track the model's loss or learning rate. As
-described in *Key Concepts*, you can compare multiple runs, and the data is
+described in _Key Concepts_, you can compare multiple runs, and the data is
 organized by tag. The line charts have the following interactions:
 
-* Clicking on the small blue icon in the lower-left corner of each chart will
-expand the chart
+- Clicking on the small blue icon in the lower-left corner of each chart will
+  expand the chart
 
-* Dragging a rectangular region on the chart will zoom in
+- Dragging a rectangular region on the chart will zoom in
 
-* Double clicking on the chart will zoom out
+- Double clicking on the chart will zoom out
 
-* Mousing over the chart will produce crosshairs, with data values recorded in
-the run-selector on the left.
+- Mousing over the chart will produce crosshairs, with data values recorded in
+  the run-selector on the left.
 
 Additionally, you can create new folders to organize tags by writing regular
 expressions in the box in the top-left of the dashboard.
@@ -237,17 +238,17 @@ side with activation histograms and training example images, for example.
 
 Features include:
 
-* Custom run colors: click on the colored circles in the run selector to change
-a run's color.
+- Custom run colors: click on the colored circles in the run selector to change
+  a run's color.
 
-* Pinned cards: click the 'pin' icon on any card to add it to the pinned section
-at the top for quick comparison.
+- Pinned cards: click the 'pin' icon on any card to add it to the pinned section
+  at the top for quick comparison.
 
-* Settings: the right pane offers settings for charts and other visualizations.
-Important settings will persist across TensorBoard sessions, when hosted at the
-same URL origin.
+- Settings: the right pane offers settings for charts and other visualizations.
+  Important settings will persist across TensorBoard sessions, when hosted at the
+  same URL origin.
 
-* Autocomplete in tag filter: search for specific charts more easily.
+- Autocomplete in tag filter: search for specific charts more easily.
 
 # Frequently Asked Questions
 
@@ -335,19 +336,19 @@ for an example.
 If you are seeing data that seems to travel backwards through time and overlap
 with itself, there are a few possible explanations.
 
-* You may have multiple execution of TensorFlow that all wrote to the same log
-directory. Please have each TensorFlow run write to its own logdir.
+- You may have multiple execution of TensorFlow that all wrote to the same log
+  directory. Please have each TensorFlow run write to its own logdir.
 
   > **Update:** the [experimental `--reload_multifile=true` option][pr-1867] can
   > now be used to poll all "active" files in a directory for new data, defined
   > as any file that received new data within `--reload_multifile_inactive_secs`
   > seconds ago, defaulting to 86400.
 
-* You may have a bug in your code where the global_step variable (passed
-to `FileWriter.add_summary`) is being maintained incorrectly.
+- You may have a bug in your code where the global_step variable (passed
+  to `FileWriter.add_summary`) is being maintained incorrectly.
 
-* It may be that your TensorFlow job crashed, and was restarted from an earlier
-checkpoint. See *How to handle TensorFlow restarts*, below.
+- It may be that your TensorFlow job crashed, and was restarted from an earlier
+  checkpoint. See _How to handle TensorFlow restarts_, below.
 
 As a workaround, try changing the x-axis display in TensorBoard from `steps` to
 `wall_time`. This will frequently clear up the issue.
@@ -378,8 +379,7 @@ download links" option in the left-hand bar. Then, each plot will provide
 download links for the data it contains.
 
 If you need access to the full dataset, you can read the event files that
-TensorBoard consumes by using the [`summary_iterator`](
-https://www.tensorflow.org/api_docs/python/tf/compat/v1/train/summary_iterator)
+TensorBoard consumes by using the [`summary_iterator`](https://www.tensorflow.org/api_docs/python/tf/compat/v1/train/summary_iterator)
 method.
 
 ### Can I make my own plugin?
@@ -458,8 +458,7 @@ that someone else has already had the same issue or question.
 General usage questions (or problems that may be specific to your local setup)
 should go to [Stack Overflow][stack-overflow].
 
-If you have found a bug in TensorBoard, please [file a GitHub issue](
-https://github.com/tensorflow/tensorboard/issues/new) with as much supporting
+If you have found a bug in TensorBoard, please [file a GitHub issue](https://github.com/tensorflow/tensorboard/issues/new) with as much supporting
 information as you can provide (e.g. attaching events files, including the output
 of `tensorboard --inspect`, etc.).
 

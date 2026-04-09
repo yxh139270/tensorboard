@@ -21,23 +21,6 @@ package_group(
 
 # The standard TensorBoard binary that serves the webapp.
 py_binary(
-    name = "tensorboard",
-    srcs = ["main.py"],
-    main = "main.py",
-    srcs_version = "PY3",
-    deps = [
-        ":assets_lib",  # link dep for webfiles assets
-        ":default",
-        ":lib",
-        ":main_lib",
-        ":program",
-        "//tensorboard/plugins:base_plugin",
-        "//tensorboard/util:tb_logging",
-        "//tensorboard/util:timing",  # non-strict dep, for patching convenience
-    ],
-)
-
-py_binary(
     name = "tensorboard_mlir",
     srcs = ["main_mlir.py"],
     main = "main_mlir.py",
@@ -59,20 +42,6 @@ py_library(
     deps = [
         "//tensorboard:expect_absl_logging_installed",
         "//tensorboard/compat:tensorflow",
-    ],
-)
-
-py_binary(
-    name = "dev",
-    srcs = ["main_dev.py"],
-    data = ["dev_webfiles.zip"],
-    main = "main_dev.py",
-    srcs_version = "PY3",
-    deps = [
-        ":default",
-        ":lib",
-        ":main_lib",
-        ":program",
     ],
 )
 
@@ -245,7 +214,7 @@ py_test(
     timeout = "moderate",
     srcs = ["manager_e2e_test.py"],
     data = [
-        ":tensorboard",
+        ":tensorboard_mlir",
     ],
     # On Python 2, this test fails about 0.5% of the time when run with
     # high parallelism; TensorBoard subprocess time out instead of
