@@ -28,14 +28,27 @@ py_binary(
     deps = [
         ":assets_lib",  # link dep for webfiles assets
         ":default",
-        ":dynamic_plugins",  # loads internal dynamic plugin like projector
         ":lib",
         ":main_lib",
         ":program",
-        "//tensorboard:expect_tensorflow_installed",
         "//tensorboard/plugins:base_plugin",
         "//tensorboard/util:tb_logging",
         "//tensorboard/util:timing",  # non-strict dep, for patching convenience
+    ],
+)
+
+py_binary(
+    name = "tensorboard_mlir",
+    srcs = ["main_mlir.py"],
+    main = "main_mlir.py",
+    srcs_version = "PY3",
+    deps = [
+        ":assets_lib",
+        ":default",
+        ":lib",
+        ":main_lib",
+        ":program",
+        "//tensorboard/plugins:base_plugin",
     ],
 )
 
@@ -57,7 +70,6 @@ py_binary(
     srcs_version = "PY3",
     deps = [
         ":default",
-        ":dynamic_plugins",  # loads internal dynamic plugin like projector
         ":lib",
         ":main_lib",
         ":program",
@@ -309,31 +321,8 @@ py_library(
     srcs = ["default.py"],
     srcs_version = "PY3",
     deps = [
-        "//tensorboard/backend:experimental_plugin",
-        "//tensorboard/plugins/audio:audio_plugin",
         "//tensorboard/plugins/core:core_plugin",
-        "//tensorboard/plugins/custom_scalar:custom_scalars_plugin",
-        "//tensorboard/plugins/debugger_v2:debugger_v2_plugin",
-        "//tensorboard/plugins/distribution:distributions_plugin",
         "//tensorboard/plugins/graph:graphs_plugin",
-        "//tensorboard/plugins/histogram:histograms_plugin",
-        "//tensorboard/plugins/hparams:hparams_plugin",
-        "//tensorboard/plugins/image:images_plugin",
-        "//tensorboard/plugins/mesh:mesh_plugin",
-        "//tensorboard/plugins/metrics:metrics_plugin",
-        "//tensorboard/plugins/pr_curve:pr_curves_plugin",
-        "//tensorboard/plugins/profile_redirect:profile_redirect_plugin",
-        "//tensorboard/plugins/scalar:scalars_plugin",
-        "//tensorboard/plugins/text:text_plugin",
-        "//tensorboard/plugins/wit_redirect:wit_redirect_plugin",
-    ],
-)
-
-py_library(
-    name = "dynamic_plugins",
-    srcs_version = "PY3",
-    deps = [
-        "//tensorboard/plugins/projector:projector_plugin",
     ],
 )
 

@@ -95,6 +95,8 @@ class GraphsPlugin(base_plugin.TBPlugin):
 
     def is_active(self):
         """The graphs plugin is active iff any run has a graph or metadata."""
+        if self._mlir_file:
+            return True
         return False  # `list_plugins` as called by TB core suffices
 
     def data_plugin_names(self):

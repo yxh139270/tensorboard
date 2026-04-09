@@ -276,12 +276,13 @@ def _find_function_body_start(text: str, search_start: int) -> int:
     while index < len(text):
         ch = text[index]
         if ch == '{' and not stack:
-            brace_end = find_matching_brace(text, index)
-            tail = text[brace_end + 1:].lstrip()
-            if not tail or tail.startswith('func.func'):
-                return index
-            stack.append('}')
-        elif ch in delimiters:
+            prefix = text[search_start:index].rstrip()
+            token_match = re.search(r'([A-Za-z_][A-Za-z0-9_.-]*)\s*$', prefix)
+            if token_match and token_match.group(1) == 'attributes':
+                index = find_matching_brace(text, index) + 1
+                continue
+            return index
+        if ch in delimiters:
             stack.append(delimiters[ch])
         elif stack and ch == stack[-1]:
             stack.pop()

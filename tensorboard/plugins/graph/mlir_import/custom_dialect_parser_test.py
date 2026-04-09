@@ -83,6 +83,24 @@ class CustomDialectParserTest(unittest.TestCase):
         ):
             parse_mlir_text(mlir_text)
 
+    def test_parse_function_with_signature_attributes_and_loc(self):
+        mlir_text = """
+          #loc = loc(unknown)
+          #loc11 = loc("x")
+          module {
+            func.func @main(%arg0: tensor<f32> {mhlo.sharding = "{replicated}"} loc("x")) -> (tensor<f32> {jax.result_info = ""}) {
+              %0 = stablehlo.cosine %arg0 : tensor<f32> loc(#loc11)
+              return %0 : tensor<f32> loc(#loc)
+            } loc(#loc)
+          }
+        """
+
+        parsed_module = parse_mlir_text(mlir_text)
+
+        self.assertEqual(len(parsed_module.functions), 1)
+        self.assertEqual(parsed_module.functions[0].name, "main")
+        self.assertEqual(len(parsed_module.functions[0].body.operations), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -279,6 +279,23 @@ class GraphsPluginV1Test(GraphsPluginBaseTest, tf.test.TestCase):
         plugin = self.load_plugin([_RUN_WITH_GRAPH_WITHOUT_METADATA])
         self.assertFalse(plugin.is_active())
 
+    def test_is_active_with_mlir_file(self):
+        mlir_text = """
+          func.func @main(%arg0: tensor<1xf32>) -> tensor<1xf32> {
+            %0 = \"test.identity\"(%arg0) : (tensor<1xf32>) -> tensor<1xf32>
+            return %0 : tensor<1xf32>
+          }
+        """
+        with tempfile.NamedTemporaryFile("w", delete=False) as f:
+            f.write(mlir_text)
+            mlir_file = f.name
+
+        try:
+            plugin = self.load_plugin([], mlir_file=mlir_file)
+            self.assertTrue(plugin.is_active())
+        finally:
+            os.remove(mlir_file)
+
     def test_info_includes_mlir_run_when_flag_set(self):
         mlir_text = """
           func.func @main(%arg0: tensor<1xf32>) -> tensor<1xf32> {

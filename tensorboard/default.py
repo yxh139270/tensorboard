@@ -12,60 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
-"""Collection of first-party plugins.
+"""Collection of first-party plugins for MLIR-only runtime."""
 
-This module exists to isolate tensorboard.program from the potentially
-heavyweight build dependencies for first-party plugins. This way people
-doing custom builds of TensorBoard have the option to only pay for the
-dependencies they want.
-
-This module also grants the flexibility to those doing custom builds, to
-automatically inherit the centrally-maintained list of standard plugins,
-for less repetition.
-"""
-
-import logging
-from importlib import metadata
-
-from tensorboard.plugins.audio import audio_plugin
 from tensorboard.plugins.core import core_plugin
-from tensorboard.plugins.custom_scalar import custom_scalars_plugin
-from tensorboard.plugins.debugger_v2 import debugger_v2_plugin
-from tensorboard.plugins.distribution import distributions_plugin
 from tensorboard.plugins.graph import graphs_plugin
-from tensorboard.plugins.histogram import histograms_plugin
-from tensorboard.plugins.hparams import hparams_plugin
-from tensorboard.plugins.image import images_plugin
-from tensorboard.plugins.metrics import metrics_plugin
-from tensorboard.plugins.pr_curve import pr_curves_plugin
-from tensorboard.plugins.profile_redirect import profile_redirect_plugin
-from tensorboard.plugins.scalar import scalars_plugin
-from tensorboard.plugins.text import text_plugin
-from tensorboard.plugins.mesh import mesh_plugin
-from tensorboard.plugins.wit_redirect import wit_redirect_plugin
-
-logger = logging.getLogger(__name__)
 
 
 # Ordering matters. The order in which these lines appear determines the
 # ordering of tabs in TensorBoard's GUI.
 _PLUGINS = [
     core_plugin.CorePluginLoader(include_debug_info=True),
-    metrics_plugin.MetricsPlugin,
-    scalars_plugin.ScalarsPlugin,
-    custom_scalars_plugin.CustomScalarsPlugin,
-    images_plugin.ImagesPlugin,
-    audio_plugin.AudioPlugin,
-    debugger_v2_plugin.DebuggerV2Plugin,
     graphs_plugin.GraphsPlugin,
-    distributions_plugin.DistributionsPlugin,
-    histograms_plugin.HistogramsPlugin,
-    text_plugin.TextPlugin,
-    pr_curves_plugin.PrCurvesPlugin,
-    profile_redirect_plugin.ProfileRedirectPluginLoader,
-    hparams_plugin.HParamsPlugin,
-    mesh_plugin.MeshPlugin,
-    wit_redirect_plugin.WITRedirectPluginLoader,
 ]
 
 
@@ -101,32 +58,8 @@ def get_static_plugins():
 
 
 def get_dynamic_plugins():
-    """Returns a list specifying TensorBoard's dynamically loaded plugins.
+    """Returns dynamically loaded plugins.
 
-    A dynamic TensorBoard plugin is specified using entry_points [1] and it is
-    the robust way to integrate plugins into TensorBoard.
-
-    This list can be passed to the `tensorboard.program.TensorBoard` API.
-
-    Returns:
-      The list of dynamic plugins.
-
-    :rtype: list[Type[base_plugin.TBLoader] | Type[base_plugin.TBPlugin]]
-
-    [1]: https://packaging.python.org/specifications/entry-points/
+    MLIR-only runtime does not load dynamic plugins.
     """
-    return [
-        entry_point.load()
-        for entry_point in _iter_entry_points("tensorboard_plugins")
-    ]
-
-
-def _iter_entry_points(group):
-    """Returns entry points for a given group across Python versions."""
-    entry_points = metadata.entry_points()
-    # In newer Python versions, `metadata.entry_points()` returns an
-    # `EntryPoints` object with a `select()` method.
-    # Before "selectable" entry points existed, it would return a dictionary.
-    if hasattr(entry_points, "select"):
-        return entry_points.select(group=group)
-    return entry_points.get(group, ())
+    return []
