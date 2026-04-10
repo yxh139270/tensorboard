@@ -66,6 +66,23 @@ def _parse_operands(operand_text: str) -> list[str]:
     return operands
 
 
+def _iter_operations_with_scope(operations, parent_scope: str):
+    for op_index, operation in enumerate(operations):
+        op_name = operation.name.strip('"')
+        op_scope = f"{parent_scope}/op_{op_index:04d}_{_sanitize_name(op_name)}"
+        yield parent_scope, op_index, operation, op_scope
+        for region_index, region in enumerate(operation.regions):
+            for block_index, block in enumerate(region.blocks):
+                child_scope = (
+                    f"{op_scope}/region_{region_index}/block_{block_index}"
+                )
+                for item in _iter_operations_with_scope(
+                    block.operations,
+                    child_scope,
+                ):
+                    yield item
+
+
 def convert_parsed_module_to_graphdef(module: ParsedModule) -> graph_pb2.GraphDef:
     graph_def = graph_pb2.GraphDef()
     used_node_names: set[str] = set()
@@ -89,20 +106,25 @@ def convert_parsed_module_to_graphdef(module: ParsedModule) -> graph_pb2.GraphDe
             node.op = "Placeholder"
             value_to_producer[argument.name] = node.name
 
-        op_index = 0
-        for operation in function.body.operations:
+        for (
+            scope_prefix,
+            op_index,
+            operation,
+            op_scope,
+        ) in _iter_operations_with_scope(
+            function.body.operations,
+            function_prefix,
+        ):
             op_name = operation.name.strip('"')
             if operation.name in _RETURN_OP_NAMES or op_name in _RETURN_OP_NAMES:
                 continue
 
-            sanitized_op_name = _sanitize_name(op_name)
             node = graph_def.node.add()
             node.name = _make_unique_name(
-                f"{function_prefix}/op_{op_index:04d}_{sanitized_op_name}",
+                op_scope,
                 used_node_names,
             )
             node.op = op_name
-            op_index += 1
 
             pending_inputs.append(
                 (node, _parse_operands(operation.operand_text))

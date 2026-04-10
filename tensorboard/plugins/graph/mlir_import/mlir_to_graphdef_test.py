@@ -20,6 +20,7 @@ from tensorboard.plugins.graph.mlir_import.custom_dialect_ir import (
     ParsedFunction,
     ParsedModule,
     ParsedOperation,
+    ParsedRegion,
     ParsedValue,
 )
 from tensorboard.plugins.graph.mlir_import.mlir_to_graphdef import (
@@ -247,6 +248,95 @@ class MlirToGraphDefTest(unittest.TestCase):
         self.assertEqual(
             nodes_by_name["main/op_0000_test.identity"].op,
             "test.identity",
+        )
+
+    def test_convert_expands_region_block_operations_with_hierarchical_names(self):
+        module = ParsedModule(
+            functions=[
+                ParsedFunction(
+                    name="main",
+                    arguments=[ParsedValue(name="%arg0")],
+                    body=ParsedBlock(),
+                )
+            ]
+        )
+        module.functions[0].body.operations = [
+            ParsedOperation(
+                name='"test.if"',
+                result_names=["%0"],
+                operand_text="%arg0",
+                regions=[
+                    ParsedRegion(
+                        blocks=[
+                            ParsedBlock(
+                                operations=[
+                                    ParsedOperation(
+                                        name='"test.inner"',
+                                        result_names=["%inner"],
+                                        operand_text="%arg0",
+                                    )
+                                ]
+                            )
+                        ]
+                    )
+                ],
+            )
+        ]
+
+        graph_def = convert_parsed_module_to_graphdef(module)
+        nodes_by_name = {node.name: node for node in graph_def.node}
+
+        self.assertIn("main/op_0000_test.if", nodes_by_name)
+        self.assertIn(
+            "main/op_0000_test.if/region_0/block_0/op_0000_test.inner",
+            nodes_by_name,
+        )
+
+    def test_convert_nested_region_operations_keep_ssa_edges(self):
+        module = ParsedModule(
+            functions=[
+                ParsedFunction(
+                    name="main",
+                    arguments=[ParsedValue(name="%arg0")],
+                    body=ParsedBlock(),
+                )
+            ]
+        )
+        module.functions[0].body.operations = [
+            ParsedOperation(
+                name='"test.produce"',
+                result_names=["%p"],
+                operand_text="%arg0",
+            ),
+            ParsedOperation(
+                name='"test.if"',
+                result_names=["%0"],
+                operand_text="%p",
+                regions=[
+                    ParsedRegion(
+                        blocks=[
+                            ParsedBlock(
+                                operations=[
+                                    ParsedOperation(
+                                        name='"test.inner_use"',
+                                        result_names=["%inner"],
+                                        operand_text="%p",
+                                    )
+                                ]
+                            )
+                        ]
+                    )
+                ],
+            ),
+        ]
+
+        graph_def = convert_parsed_module_to_graphdef(module)
+        nodes_by_name = {node.name: node for node in graph_def.node}
+        self.assertEqual(
+            nodes_by_name[
+                "main/op_0001_test.if/region_0/block_0/op_0000_test.inner_use"
+            ].input,
+            ["main/op_0000_test.produce"],
         )
 
 
