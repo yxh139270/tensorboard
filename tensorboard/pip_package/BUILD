@@ -39,13 +39,9 @@ sh_binary(
         "setup.cfg",
         "setup.py",
         ":deterministic_tar_gz",
-        "//tensorboard",  # Main tensorboard binary and everything it uses
+        "//tensorboard:tensorboard_mlir",  # Main tensorboard binary and everything it uses
         "//tensorboard:lib",  # User-facing overall TensorBoard API
         "//tensorboard:version",  # Version module (read by setup.py)
-        "//tensorboard/plugins/hparams",  # User-facing hparams API
-        "//tensorboard/plugins/mesh",  #  User-facing mesh API
-        "//tensorboard/plugins/projector",  # User-facing projector API
-        "//tensorboard/summary:tf_summary",  #  tf.summary API for TF 2.0
     ],
 )
 
