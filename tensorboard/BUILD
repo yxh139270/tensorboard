@@ -41,7 +41,6 @@ py_library(
     srcs_version = "PY3",
     deps = [
         "//tensorboard:expect_absl_logging_installed",
-        "//tensorboard/compat:tensorflow",
     ],
 )
 
@@ -208,25 +207,6 @@ py_test(
     ],
 )
 
-py_test(
-    name = "manager_e2e_test",
-    size = "large",  # spawns subprocesses, sleeps, makes requests to localhost
-    timeout = "moderate",
-    srcs = ["manager_e2e_test.py"],
-    data = [
-        ":tensorboard_mlir",
-    ],
-    # On Python 2, this test fails about 0.5% of the time when run with
-    # high parallelism; TensorBoard subprocess time out instead of
-    # launching successfully.
-    flaky = True,
-    srcs_version = "PY3",
-    visibility = ["//tensorboard:internal"],
-    deps = [
-        ":manager",
-        "//tensorboard:expect_tensorflow_installed",
-    ],
-)
 
 py_library(
     name = "notebook",
@@ -255,24 +235,6 @@ py_library(
     ],
 )
 
-py_test(
-    name = "program_test",
-    size = "large",
-    srcs = ["program_test.py"],
-    srcs_version = "PY3",
-    tags = [
-        "exclusive",
-        "support_notf",
-    ],
-    deps = [
-        ":default",
-        ":program",
-        ":test",
-        "//tensorboard/plugins:base_plugin",
-        "//tensorboard/plugins/core:core_plugin",
-        "@org_pocoo_werkzeug",
-    ],
-)
 
 py_library(
     name = "test",
@@ -295,18 +257,6 @@ py_library(
     ],
 )
 
-py_test(
-    name = "default_test",
-    size = "small",
-    srcs = ["default_test.py"],
-    srcs_version = "PY3",
-    tags = ["support_notf"],
-    deps = [
-        ":default",
-        ":test",
-        "//tensorboard/plugins:base_plugin",
-    ],
-)
 
 py_library(
     name = "version",

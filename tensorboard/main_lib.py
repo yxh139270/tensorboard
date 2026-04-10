@@ -19,8 +19,6 @@ import sys
 
 import absl.logging
 
-from tensorboard.compat import tf
-
 
 _TBDEV_SHUTDOWN_MESSAGE = """\
 ======================================================================
@@ -46,12 +44,6 @@ def global_init():
     # but for older versions of TF, we avoid a regression by setting this env var to
     # disable the cache, which must be done before the first import of tensorflow.
     os.environ["GCS_READ_CACHE_DISABLED"] = "1"
-
-    if getattr(tf, "__version__", "stub") == "stub":
-        print(
-            "TensorFlow installation not found - running with reduced feature set.",
-            file=sys.stderr,
-        )
 
     # Only emit log messages at WARNING and above by default to reduce spam.
     absl.logging.set_verbosity(absl.logging.WARNING)
